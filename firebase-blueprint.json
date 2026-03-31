@@ -1,0 +1,70 @@
+{
+  "entities": {
+    "Trade": {
+      "title": "Trade",
+      "description": "A single trading record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "symbol": { "type": "string", "description": "Ticker symbol (e.g., BTC/USD, AAPL)" },
+        "type": { "type": "string", "enum": ["long", "short"] },
+        "entryPrice": { "type": "number" },
+        "exitPrice": { "type": "number" },
+        "quantity": { "type": "number" },
+        "entryDate": { "type": "string", "format": "date-time" },
+        "exitDate": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["open", "closed"] },
+        "notes": { "type": "string" },
+        "pnl": { "type": "number", "description": "Profit or Loss" },
+        "imageUrl": { "type": "string", "description": "Base64 or URL of trade screenshot" },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "accountId": { "type": "string", "description": "Reference to the trading account" }
+      },
+      "required": ["userId", "symbol", "type", "entryPrice", "entryDate", "status"]
+    },
+    "Account": {
+      "title": "Account",
+      "description": "A trading account with prop firm limits",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "initialBalance": { "type": "number" },
+        "maxDailyLoss": { "type": "number" },
+        "maxDrawdown": { "type": "number" },
+        "userId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "name", "initialBalance", "maxDailyLoss", "maxDrawdown"]
+    },
+    "UserSettings": {
+      "title": "User Settings",
+      "description": "User preferences and profile data",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "displayName": { "type": "string" },
+        "currency": { "type": "string", "default": "USD" },
+        "themeColor": { "type": "string", "default": "#F27D26" },
+        "theme": { "type": "string", "enum": ["light", "dark"], "default": "dark" },
+        "selectedAccountId": { "type": "string" }
+      },
+      "required": ["userId"]
+    }
+  },
+  "firestore": {
+    "/trades/{tradeId}": {
+      "schema": "Trade",
+      "description": "Collection of user trades"
+    },
+    "/accounts/{accountId}": {
+      "schema": "Account",
+      "description": "Collection of user trading accounts"
+    },
+    "/userSettings/{userId}": {
+      "schema": "UserSettings",
+      "description": "User specific settings"
+    }
+  }
+}

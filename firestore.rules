@@ -1,0 +1,119 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: trades
+    // Document ID: auto-generated
+    // Fields:
+    //   - userId: string (required, immutable) - Owner of the trade
+    //   - symbol: string (required) - Ticker symbol
+    //   - type: string (required, enum: long, short)
+    //   - entryPrice: number (required)
+    //   - exitPrice: number (optional)
+    //   - quantity: number (required)
+    //   - entryDate: timestamp (required)
+    //   - exitDate: timestamp (optional)
+    //   - status: string (required, enum: open, closed)
+    //   - notes: string (optional)
+    //   - pnl: number (optional)
+    //   - tags: list (optional)
+    //
+    // Collection: userSettings
+    // Document ID: userId
+    // Fields:
+    //   - userId: string (required, immutable)
+    //   - displayName: string (optional)
+    //   - currency: string (optional)
+    //
+    // Collection: accounts
+    // Document ID: auto-generated
+    // Fields:
+    //   - userId: string (required, immutable) - Owner of the account
+    //   - name: string (required) - Account name
+    //   - initialBalance: number (required)
+    //   - maxDailyLoss: number (required)
+    //   - maxDrawdown: number (required)
+    //   - createdAt: timestamp (optional)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isDocOwner() {
+      return isAuthenticated() && request.auth.uid == resource.data.userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && 
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+         (request.auth.token.email == "eyovix@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function isValidTrade(data) {
+      return data.userId == request.auth.uid &&
+             data.symbol is string && data.symbol.size() > 0 && data.symbol.size() < 20 &&
+             data.type in ['long', 'short'] &&
+             data.entryPrice is number && data.entryPrice >= 0 &&
+             data.status in ['open', 'closed'] &&
+             (!('notes' in data) || (data.notes is string && data.notes.size() < 5000)) &&
+             (!('imageUrl' in data) || (data.imageUrl is string && data.imageUrl.size() < 800000)) &&
+             (!('tags' in data) || (data.tags is list && data.tags.size() < 20)) &&
+             (!('accountId' in data) || (data.accountId is string));
+    }
+
+    function isValidAccount(data) {
+      return data.userId == request.auth.uid &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.initialBalance is number && data.initialBalance >= 0 &&
+             data.maxDailyLoss is number && data.maxDailyLoss >= 0 &&
+             data.maxDrawdown is number && data.maxDrawdown >= 0;
+    }
+
+    function isValidUserSettings(data) {
+      return data.userId == request.auth.uid &&
+             (!('displayName' in data) || (data.displayName is string && data.displayName.size() < 100)) &&
+             (!('currency' in data) || (data.currency is string && data.currency.size() < 10)) &&
+             (!('theme' in data) || (data.theme in ['light', 'dark'])) &&
+             (!('themeColor' in data) || (data.themeColor is string && data.themeColor.size() < 20)) &&
+             (!('selectedAccountId' in data) || (data.selectedAccountId is string));
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /trades/{tradeId} {
+      allow read: if isDocOwner() || isAdmin();
+      allow create: if isAuthenticated() && isValidTrade(request.resource.data);
+      allow update: if isDocOwner() && isValidTrade(request.resource.data) && 
+                      request.resource.data.userId == resource.data.userId;
+      allow delete: if isDocOwner() || isAdmin();
+    }
+
+    match /accounts/{accountId} {
+      allow read: if isDocOwner() || isAdmin();
+      allow create: if isAuthenticated() && isValidAccount(request.resource.data);
+      allow update: if isDocOwner() && isValidAccount(request.resource.data) && 
+                      request.resource.data.userId == resource.data.userId;
+      allow delete: if isDocOwner() || isAdmin();
+    }
+
+    match /userSettings/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create, update: if isOwner(userId) && isValidUserSettings(request.resource.data);
+    }
+  }
+}
